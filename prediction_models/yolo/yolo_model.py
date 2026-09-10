@@ -49,7 +49,7 @@ class YoloModel:
                 data=str(yaml_path),
                 epochs=epochs,
                 imgsz=imgsz,
-                project=weights_dir,
+                project=str(Path(weights_dir).resolve()),
                 name=name,
             )
         finally:

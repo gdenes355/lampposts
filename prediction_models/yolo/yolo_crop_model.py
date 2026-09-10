@@ -58,7 +58,7 @@ class YoloCropModel:
                 data=str(data_dir / "dataset.yaml"),
                 epochs=epochs,
                 imgsz=_TRAIN_SZ,
-                project=weights_dir,
+                project=str(Path(weights_dir).resolve()),
                 name=name,
             )
         finally:
