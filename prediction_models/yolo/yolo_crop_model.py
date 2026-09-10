@@ -49,7 +49,7 @@ class YoloCropModel:
         rng.shuffle(val_pool)
         val_tiles = val_pool[: max(1, len(val_pool) // 5)]
 
-        data_dir = Path(tempfile.mkdtemp(prefix="yolo_crop_"))
+        data_dir = Path(tempfile.mkdtemp(prefix="yolo_crop_", dir=Path(weights_dir).resolve().parent))
         try:
             self._write_crops(data_dir, "train", train_tiles, points, seed)
             self._write_crops(data_dir, "val",   val_tiles,   points, seed + 1)
