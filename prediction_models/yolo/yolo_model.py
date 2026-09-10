@@ -40,7 +40,9 @@ class YoloModel:
             val_tiles = train_tiles[:split]
             train_tiles = train_tiles[split:]
 
-        data_dir = Path(tempfile.mkdtemp(prefix="yolo_data_", dir=Path(weights_dir).resolve().parent))
+        tmp_parent = Path(weights_dir).resolve().parent
+        tmp_parent.mkdir(parents=True, exist_ok=True)
+        data_dir = Path(tempfile.mkdtemp(prefix="yolo_data_", dir=tmp_parent))
         try:
             _write_split(data_dir, "train", train_tiles, points, bbox_px, imgsz)
             _write_split(data_dir, "val",   val_tiles,   points, bbox_px, imgsz)
