@@ -1,4 +1,5 @@
 """5-fold cross-validation for the YOLO lamp post detector."""
+import gc
 import os
 import random
 from dataclasses import dataclass, field
@@ -89,6 +90,12 @@ def kfold_evaluate(
         result = FoldResult(fold=fold + 1, precision=p, recall=r, f1=f1, map50=m50, map50_95=m95)
         report.folds.append(result)
         print(f"  P={p:.3f}  R={r:.3f}  F1={f1:.3f}  mAP50={m50:.3f}  mAP50-95={m95:.3f}")
+
+        # Release cached tile images to keep RAM under control across folds
+        for t in shuffled:
+            t._img = None
+            t._img_pil = None
+        gc.collect()
 
     return report
 
