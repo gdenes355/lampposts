@@ -99,12 +99,15 @@ def _write_split(
         img_resized = cv2.resize(img, (imgsz, imgsz), interpolation=cv2.INTER_AREA)
         cv2.imwrite(str(img_dir / f"{stem}.png"), img_resized)
 
+        # Free cached image immediately — don't accumulate 1028 × 9 MB in RAM
+        tile._img = None
+        tile._img_pil = None
+
         tile_points = [p for p in points if tile.is_inside(p)]
         with open(lbl_dir / f"{stem}.txt", "w") as f:
             for p in tile_points:
                 cx = (p.x - left) / (right - left)
                 cy = (top - p.y) / (top - bottom)
-                # bbox size scales with the resize ratio
                 f.write(f"0 {cx:.6f} {cy:.6f} {bbox_px/src_w:.6f} {bbox_px/src_h:.6f}\n")
 
 

@@ -146,6 +146,10 @@ class YoloCropModel:
                 idx += 1
                 generated += 1
 
+            # Free cached image once all crops for this tile are written
+            tile._img = None
+            tile._img_pil = None
+
     def _save_crop(
         self,
         img, x0, y0, x1, y1,
