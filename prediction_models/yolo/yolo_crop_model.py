@@ -39,6 +39,7 @@ class YoloCropModel:
         weights_dir: str = "weights/yolo_crop",
         name: str = "train",
         seed: int = 42,
+        batch: int = 64,
     ) -> Path:
         """Train on crops centred on each annotation (plus equal negative crops).
 
@@ -60,6 +61,7 @@ class YoloCropModel:
                 data=str(data_dir / "dataset.yaml"),
                 epochs=epochs,
                 imgsz=_TRAIN_SZ,
+                batch=batch,
                 project=str(Path(weights_dir).resolve()),
                 name=name,
             )
