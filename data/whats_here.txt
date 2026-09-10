@@ -1,0 +1,4 @@
+New_pipeline_for_digitising_historic_lamp_posts - my colab notebook from the last time I ran YOLO (with a lot less annotations)
+lamp_post_annotations.gpkg - the 1478 lampposts in Cambridge
+cambridge_tifs/ - split into lampposts and no_lampposts
+main.py - what I was using to do the gemini trial

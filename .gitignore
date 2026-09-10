@@ -1,0 +1,8 @@
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+.claude/
+runs/
+weights/
+*.pt
