@@ -47,10 +47,11 @@ def evaluate(
     weights_dir: str = "weights/yolo_crop",
     name: str = "eval_run",
     batch: int = 64,
+    neg_ratio: float = 0.0,
 ) -> EvalResult:
     model = YoloCropModel(crop_px=crop_px)
     print(f"Training on {len(train_tiles)} tiles, evaluating on {len(val_tiles)} tiles …")
-    model.train(train_tiles, points, epochs=epochs, weights_dir=weights_dir, name=name, batch=batch)
+    model.train(train_tiles, points, epochs=epochs, weights_dir=weights_dir, name=name, batch=batch, neg_ratio=neg_ratio)
 
     tp = fp = fn = fp_empty = n_empty = 0
     n_gt_total = 0

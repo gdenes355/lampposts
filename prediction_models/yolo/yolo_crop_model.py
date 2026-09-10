@@ -40,13 +40,16 @@ class YoloCropModel:
         name: str = "train",
         seed: int = 42,
         batch: int = 64,
+        neg_ratio: float = 0.0,
     ) -> Path:
-        """Train on crops centred on each annotation (plus equal negative crops).
+        """Train on crops centred on each annotation.
 
+        neg_ratio: negatives per positive (0 = positive crops only, fastest).
         Returns path to best.pt.
         """
+        annotated = [t for t in train_tiles if any(t.is_inside(p) for p in points)]
         rng = random.Random(seed)
-        val_pool = train_tiles[:]
+        val_pool = annotated[:]
         rng.shuffle(val_pool)
         val_tiles = val_pool[: max(1, len(val_pool) // 5)]
 
@@ -54,8 +57,8 @@ class YoloCropModel:
         tmp_parent.mkdir(parents=True, exist_ok=True)
         data_dir = Path(tempfile.mkdtemp(prefix="yolo_crop_", dir=tmp_parent))
         try:
-            self._write_crops(data_dir, "train", train_tiles, points, seed)
-            self._write_crops(data_dir, "val",   val_tiles,   points, seed + 1)
+            self._write_crops(data_dir, "train", annotated, points, seed, neg_ratio)
+            self._write_crops(data_dir, "val",   val_tiles,  points, seed + 1, neg_ratio)
             _write_yaml(data_dir)
             self._model.train(
                 data=str(data_dir / "dataset.yaml"),
@@ -110,6 +113,7 @@ class YoloCropModel:
         tiles: list[Tile],
         points: list[Point],
         seed: int,
+        neg_ratio: float = 0.0,
     ) -> None:
         img_dir = data_dir / "images" / split
         lbl_dir = data_dir / "labels" / split
@@ -132,8 +136,8 @@ class YoloCropModel:
                 x0, y0, x1, y1 = _centred_window(px, py, self._crop_px, w, h)
                 idx = self._save_crop(img, x0, y0, x1, y1, tile_pts, left, bottom, right, top, w, h, img_dir, lbl_dir, idx)
 
-            # negative crops — 1:1 with positives
-            n_neg  = max(2, len(tile_pts))
+            # negative crops — controlled by neg_ratio (0 = disabled)
+            n_neg  = int(len(tile_pts) * neg_ratio)
             generated = attempts = 0
             while generated < n_neg and attempts < 100:
                 attempts += 1
