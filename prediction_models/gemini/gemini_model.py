@@ -31,11 +31,8 @@ class GeminiModel:
         points: list[Point] = []
 
         try:
-            response = self._client.models.generate_content(
-                model=self._model,
-                contents=[img, PROMPT],
-                config=GENERATE_CONFIG,
-            )
+            chat     = self._client.chats.create(model=self._model, config=GENERATE_CONFIG)
+            response = chat.send_message([img, PROMPT])
         except Exception as exc:
             print(f"  [Gemini error] {exc}")
             if tracker:
@@ -48,9 +45,10 @@ class GeminiModel:
             tracker.add(response.usage_metadata)
             usage = response.usage_metadata
             if usage:
+                from prediction_models.gemini._shared import _PRICE_INPUT_PER_M, _PRICE_OUTPUT_PER_M
                 cost = (
-                    (usage.prompt_token_count or 0) / 1_000_000 * 0.15
-                    + (usage.candidates_token_count or 0) / 1_000_000 * 0.60
+                    (usage.prompt_token_count or 0) / 1_000_000 * _PRICE_INPUT_PER_M
+                    + (usage.candidates_token_count or 0) / 1_000_000 * _PRICE_OUTPUT_PER_M
                 )
                 print(
                     f"  tokens in={usage.prompt_token_count}  "

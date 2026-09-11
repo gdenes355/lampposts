@@ -49,11 +49,8 @@ class GeminiCropModel:
             cw, ch   = x1 - x0, y1 - y0
 
             try:
-                response = self._client.models.generate_content(
-                    model=self._model,
-                    contents=[crop_pil, PROMPT],
-                    config=GENERATE_CONFIG,
-                )
+                chat     = self._client.chats.create(model=self._model, config=GENERATE_CONFIG)
+                response = chat.send_message([crop_pil, PROMPT])
             except Exception as exc:
                 print(f"  [Gemini error on crop ({x0},{y0})] {exc}")
                 if tracker:
