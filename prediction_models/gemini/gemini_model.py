@@ -46,13 +46,15 @@ class GeminiModel:
             usage = response.usage_metadata
             if usage:
                 from prediction_models.gemini._shared import _PRICE_INPUT_PER_M, _PRICE_OUTPUT_PER_M
-                cost = (
+                think = usage.thoughts_token_count or 0
+                out   = usage.candidates_token_count or 0
+                cost  = (
                     (usage.prompt_token_count or 0) / 1_000_000 * _PRICE_INPUT_PER_M
-                    + (usage.candidates_token_count or 0) / 1_000_000 * _PRICE_OUTPUT_PER_M
+                    + (out + think) / 1_000_000 * _PRICE_OUTPUT_PER_M
                 )
                 print(
                     f"  tokens in={usage.prompt_token_count}  "
-                    f"out={usage.candidates_token_count}  "
+                    f"out={out}  think={think}  "
                     f"tile_cost=${cost:.5f}"
                 )
 
