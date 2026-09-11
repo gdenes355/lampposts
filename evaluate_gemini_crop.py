@@ -85,30 +85,32 @@ def evaluate(tiles, points, crop_px: int = _CROP_PX) -> tuple[EvalResult, CostTr
 
 _CSV_FIELDS = [
     "timestamp", "fold", "crop_px", "sample_frac", "n_tiles",
-    "n_gt", "tp", "fp", "fn", "precision", "recall", "f1", "cost_usd",
+    "n_gt", "tp", "fp", "fn", "precision", "recall", "f1", "cost_usd", "thinking_budget",
 ]
 
 
 def _append_csv(fold: int, result: EvalResult, tracker: CostTracker, crop_px: int) -> None:
+    from prediction_models.gemini._shared import _THINKING_BUDGET
     write_header = not _CSV_PATH.exists()
     with _CSV_PATH.open("a", newline="") as f:
         w = csv.DictWriter(f, fieldnames=_CSV_FIELDS)
         if write_header:
             w.writeheader()
         w.writerow({
-            "timestamp":   datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "fold":        fold,
-            "crop_px":     crop_px,
-            "sample_frac": _SAMPLE_FRAC,
-            "n_tiles":     result.n_tiles,
-            "n_gt":        result.n_gt,
-            "tp":          result.tp,
-            "fp":          result.fp,
-            "fn":          result.fn,
-            "precision":   round(result.precision, 6),
-            "recall":      round(result.recall, 6),
-            "f1":          round(result.f1, 6),
-            "cost_usd":    round(tracker.cost_usd, 6),
+            "timestamp":       datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "fold":            fold,
+            "crop_px":         crop_px,
+            "sample_frac":     _SAMPLE_FRAC,
+            "n_tiles":         result.n_tiles,
+            "n_gt":            result.n_gt,
+            "tp":              result.tp,
+            "fp":              result.fp,
+            "fn":              result.fn,
+            "precision":       round(result.precision, 6),
+            "recall":          round(result.recall, 6),
+            "f1":              round(result.f1, 6),
+            "cost_usd":        round(tracker.cost_usd, 6),
+            "thinking_budget": _THINKING_BUDGET,
         })
     print(f"  [CSV] appended fold {fold} → {_CSV_PATH}")
 
