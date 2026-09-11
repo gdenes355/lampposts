@@ -43,10 +43,12 @@ class GeminiCropModel:
         windows = _window_positions(w, h, self._crop_px, self._stride)
         raw: list[tuple[float, float, float]] = []   # (bng_x, bng_y, confidence=1.0)
 
-        for x0, y0, x1, y1 in windows:
+        n_windows = len(windows)
+        for i_w, (x0, y0, x1, y1) in enumerate(windows):
             crop_arr = img[y0:y1, x0:x1]
             crop_pil = Image.fromarray(crop_arr)
             cw, ch   = x1 - x0, y1 - y0
+            print(f"    crop {i_w+1}/{n_windows} ({x0},{y0})", flush=True)
 
             try:
                 chat     = self._client.chats.create(model=self._model, config=GENERATE_CONFIG)

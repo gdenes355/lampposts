@@ -23,7 +23,7 @@ def make_client() -> genai.Client:
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
         raise RuntimeError("GEMINI_API_KEY not set — add it to .env")
-    return genai.Client(api_key=api_key)
+    return genai.Client(api_key=api_key, http_options=types.HttpOptions(timeout=120))
 
 
 class CandidateLampPost(BaseModel):
@@ -50,7 +50,7 @@ PROMPT = (
     "and transcribe the exact text read."
 )
 
-_THINKING_BUDGET = 2048   # tokens; was uncapped ("HIGH") — reduce to cut latency/cost
+_THINKING_BUDGET = 4096   # tokens; was uncapped ("HIGH") — reduce to cut latency/cost
 
 GENERATE_CONFIG = types.GenerateContentConfig(
     response_mime_type="application/json",
