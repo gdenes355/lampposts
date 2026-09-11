@@ -10,10 +10,11 @@ from prediction_models.gemini._shared import CostTracker
 from prediction_models.gemini.gemini_crop_model import GeminiCropModel
 
 _MATCH_DIST_M = 5.0
-_SAMPLE_FRAC  = 0.01   # fraction of all tiles to evaluate (tweak as needed)
+_SAMPLE_FRAC  = 0.01   # fraction of all tiles per fold (tweak as needed)
 _SEED         = 42
 _CROP_PX      = 500    # crop window size in pixels
-_MAX_WORKERS  = 3      # parallel Gemini requests (each tile fires ~9 crops)
+_MAX_WORKERS  = 3      # parallel Gemini requests (each tile fires ~9 crop calls)
+_FOLDS        = 3      # number of independent random samples to run
 
 
 def _process_tile(
@@ -23,7 +24,7 @@ def _process_tile(
     idx, total, tile, points, model, tracker = args
     gt = [p for p in points if tile.is_inside(p)]
     preds = model.predict(tile, tracker=tracker)
-    print(f"[{idx}/{total}] {tile.path}  GT={len(gt)}  preds={len(preds)}")
+    print(f"  [{idx}/{total}] {tile.path}  GT={len(gt)}  preds={len(preds)}")
 
     if not gt:
         return 0, len(preds), 0, len(preds), True, 0
@@ -78,22 +79,57 @@ def evaluate(tiles, points, crop_px: int = _CROP_PX) -> tuple[EvalResult, CostTr
     ), tracker
 
 
+def _print_table(fold_results: list[tuple[EvalResult, CostTracker]]) -> None:
+    header = (f"{'Fold':>5}  {'Tiles':>5}  {'GT':>5}  {'TP':>5}  {'FP':>5}  {'FN':>4}  "
+              f"{'P':>6}  {'R':>6}  {'F1':>6}  {'Cost':>9}")
+    print(header)
+    print("-" * len(header))
+    total_tracker = CostTracker()
+    for fold, (res, tracker) in enumerate(fold_results, 1):
+        print(
+            f"{fold:>5}  {res.n_tiles:>5}  {res.n_gt:>5}  {res.tp:>5}  {res.fp:>5}  "
+            f"{res.fn:>4}  {res.precision:>6.3f}  {res.recall:>6.3f}  {res.f1:>6.3f}  "
+            f"${tracker.cost_usd:>8.4f}"
+        )
+        total_tracker.in_tokens  += tracker.in_tokens
+        total_tracker.out_tokens += tracker.out_tokens
+        total_tracker.calls      += tracker.calls
+        total_tracker.errors     += tracker.errors
+    print("-" * len(header))
+    n = len(fold_results)
+    mean_p  = sum(r.precision for r, _ in fold_results) / n
+    mean_r  = sum(r.recall    for r, _ in fold_results) / n
+    mean_f1 = sum(r.f1        for r, _ in fold_results) / n
+    print(
+        f"{'mean':>5}  {'':>5}  {'':>5}  {'':>5}  {'':>5}  {'':>4}  "
+        f"{mean_p:>6.3f}  {mean_r:>6.3f}  {mean_f1:>6.3f}  "
+        f"${total_tracker.cost_usd:>8.4f}"
+    )
+    print(
+        f"\nTotal API calls: {total_tracker.calls}  errors: {total_tracker.errors}  "
+        f"tokens in: {total_tracker.in_tokens:,}  out: {total_tracker.out_tokens:,}  "
+        f"total cost: ${total_tracker.cost_usd:.4f}"
+    )
+
+
 if __name__ == "__main__":
     collection = load_points("data/lamp_post_annotations.gpkg")
     all_tiles  = load_all_tiles("data")
+    n_sample   = max(1, int(len(all_tiles) * _SAMPLE_FRAC))
 
-    rng = random.Random(_SEED)
-    shuffled = all_tiles[:]
-    rng.shuffle(shuffled)
-    n_sample = max(1, int(len(shuffled) * _SAMPLE_FRAC))
-    sample   = shuffled[:n_sample]
+    print(f"{len(all_tiles)} total tiles  {_SAMPLE_FRAC*100:.1f}% sample → "
+          f"{n_sample} tiles/fold  {_FOLDS} folds  crop_px={_CROP_PX}  workers={_MAX_WORKERS}\n")
 
-    print(f"{len(all_tiles)} total tiles → evaluating {n_sample} "
-          f"({_SAMPLE_FRAC*100:.1f}%)  crop_px={_CROP_PX}  workers={_MAX_WORKERS}\n")
+    fold_results: list[tuple[EvalResult, CostTracker]] = []
+    for fold in range(_FOLDS):
+        seed = _SEED + fold          # different sample each fold
+        rng  = random.Random(seed)
+        shuffled = all_tiles[:]
+        rng.shuffle(shuffled)
+        sample = shuffled[:n_sample]
+        print(f"── Fold {fold + 1}/{_FOLDS}  (seed={seed}) ──")
+        result, tracker = evaluate(sample, collection.points, crop_px=_CROP_PX)
+        fold_results.append((result, tracker))
 
-    result, tracker = evaluate(sample, collection.points, crop_px=_CROP_PX)
-
-    print()
-    result.print()
-    print()
-    tracker.print_summary()
+    print("\n" + "=" * 70)
+    _print_table(fold_results)
