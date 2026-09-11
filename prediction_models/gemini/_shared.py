@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 
 load_dotenv()
 
-_GEMINI_MODEL = "gemini-2.5-flash"
+_GEMINI_MODEL = "gemini-3.8-flash"
 
 # Pricing for gemini-2.5-flash (USD per million tokens, as of 2025-09)
 # Thinking tokens are billed at the output rate.
