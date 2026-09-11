@@ -127,10 +127,11 @@ def _print_table(fold_results: list[tuple[EvalResult, CostTracker]]) -> None:
             f"{res.fn:>4}  {res.precision:>6.3f}  {res.recall:>6.3f}  {res.f1:>6.3f}  "
             f"${tracker.cost_usd:>8.4f}"
         )
-        total_tracker.in_tokens  += tracker.in_tokens
-        total_tracker.out_tokens += tracker.out_tokens
-        total_tracker.calls      += tracker.calls
-        total_tracker.errors     += tracker.errors
+        total_tracker.in_tokens    += tracker.in_tokens
+        total_tracker.out_tokens   += tracker.out_tokens
+        total_tracker.think_tokens += tracker.think_tokens
+        total_tracker.calls        += tracker.calls
+        total_tracker.errors       += tracker.errors
     print("-" * len(header))
     n = len(fold_results)
     mean_p  = sum(r.precision for r, _ in fold_results) / n
@@ -144,7 +145,7 @@ def _print_table(fold_results: list[tuple[EvalResult, CostTracker]]) -> None:
     print(
         f"\nTotal API calls: {total_tracker.calls}  errors: {total_tracker.errors}  "
         f"tokens in: {total_tracker.in_tokens:,}  out: {total_tracker.out_tokens:,}  "
-        f"total cost: ${total_tracker.cost_usd:.4f}"
+        f"think: {total_tracker.think_tokens:,}  total cost: ${total_tracker.cost_usd:.4f}"
     )
 
 
