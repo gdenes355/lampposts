@@ -50,10 +50,12 @@ PROMPT = (
     "and transcribe the exact text read."
 )
 
+_THINKING_BUDGET = 2048   # tokens; was uncapped ("HIGH") — reduce to cut latency/cost
+
 GENERATE_CONFIG = types.GenerateContentConfig(
     response_mime_type="application/json",
     response_schema=LampPostResponse,
-    thinking_config=types.ThinkingConfig(thinking_level="HIGH"),
+    thinking_config=types.ThinkingConfig(thinking_budget=_THINKING_BUDGET),
 )
 
 
