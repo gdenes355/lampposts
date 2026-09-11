@@ -1,7 +1,10 @@
 """Evaluate the Gemini full-tile lamp post detector on a sample of tiles."""
+import csv
 import math
 import random
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime, timezone
+from pathlib import Path
 
 from data_utils.gpkg.gpkg_loader import load_points
 from data_utils.models import Point, Tile
@@ -10,11 +13,12 @@ from prediction_models.gemini._shared import CostTracker
 from prediction_models.gemini.gemini_model import GeminiModel
 
 _MATCH_DIST_M = 5.0
-_SAMPLE_FRAC  = 0.01   # fraction of all tiles per fold (tweak as needed)
+_SAMPLE_FRAC  = 0.1   # fraction of all tiles per fold (tweak as needed)
 _SEED         = 42
 _SCALE        = 1.0    # image scale factor sent to Gemini (e.g. 0.5 = half size)
 _MAX_WORKERS  = 5      # parallel Gemini requests
 _FOLDS        = 3      # number of independent random samples to run
+_CSV_PATH     = Path("results_gemini.csv")
 
 
 def _process_tile(
@@ -79,6 +83,36 @@ def evaluate(tiles, points, scale: float = _SCALE) -> tuple[EvalResult, CostTrac
     ), tracker
 
 
+_CSV_FIELDS = [
+    "timestamp", "fold", "scale", "sample_frac", "n_tiles",
+    "n_gt", "tp", "fp", "fn", "precision", "recall", "f1", "cost_usd",
+]
+
+
+def _append_csv(fold: int, result: EvalResult, tracker: CostTracker, scale: float) -> None:
+    write_header = not _CSV_PATH.exists()
+    with _CSV_PATH.open("a", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=_CSV_FIELDS)
+        if write_header:
+            w.writeheader()
+        w.writerow({
+            "timestamp":   datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "fold":        fold,
+            "scale":       scale,
+            "sample_frac": _SAMPLE_FRAC,
+            "n_tiles":     result.n_tiles,
+            "n_gt":        result.n_gt,
+            "tp":          result.tp,
+            "fp":          result.fp,
+            "fn":          result.fn,
+            "precision":   round(result.precision, 6),
+            "recall":      round(result.recall, 6),
+            "f1":          round(result.f1, 6),
+            "cost_usd":    round(tracker.cost_usd, 6),
+        })
+    print(f"  [CSV] appended fold {fold} → {_CSV_PATH}")
+
+
 def _print_table(fold_results: list[tuple[EvalResult, CostTracker]]) -> None:
     header = (f"{'Fold':>5}  {'Tiles':>5}  {'GT':>5}  {'TP':>5}  {'FP':>5}  {'FN':>4}  "
               f"{'P':>6}  {'R':>6}  {'F1':>6}  {'Cost':>9}")
@@ -130,6 +164,7 @@ if __name__ == "__main__":
         print(f"── Fold {fold + 1}/{_FOLDS}  (seed={seed}) ──")
         result, tracker = evaluate(sample, collection.points, scale=_SCALE)
         fold_results.append((result, tracker))
+        _append_csv(fold + 1, result, tracker, scale=_SCALE)
 
     print("\n" + "=" * 70)
     _print_table(fold_results)
