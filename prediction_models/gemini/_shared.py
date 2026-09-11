@@ -51,7 +51,6 @@ PROMPT = (
 GENERATE_CONFIG = types.GenerateContentConfig(
     response_mime_type="application/json",
     response_schema=LampPostResponse,
-    thinking_config=types.ThinkingConfig(thinking_level="HIGH"),
 )
 
 
