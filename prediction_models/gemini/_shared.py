@@ -11,10 +11,11 @@ load_dotenv()
 
 _GEMINI_MODEL = "gemini-3.8-flash"
 
-# Pricing for gemini-2.5-flash (USD per million tokens, as of 2025-09)
+# Pricing for gemini-3.8-flash (USD per million tokens, introductory until 2026-12-31)
+# Standard from 2027-01-01: $1.50/M input, $7.50/M output.
 # Thinking tokens are billed at the output rate.
-_PRICE_INPUT_PER_M  = 0.15
-_PRICE_OUTPUT_PER_M = 0.60
+_PRICE_INPUT_PER_M  = 0.75
+_PRICE_OUTPUT_PER_M = 3.75
 
 
 def make_client() -> genai.Client:
@@ -51,6 +52,7 @@ PROMPT = (
 GENERATE_CONFIG = types.GenerateContentConfig(
     response_mime_type="application/json",
     response_schema=LampPostResponse,
+    thinking_config=types.ThinkingConfig(thinking_level="HIGH"),
 )
 
 
