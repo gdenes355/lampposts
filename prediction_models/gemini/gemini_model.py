@@ -39,7 +39,7 @@ class GeminiModel:
         except Exception as exc:
             print(f"  [Gemini error] {exc}")
             if tracker:
-                tracker.errors += 1
+                tracker.add_error()
             tile._img = None
             tile._img_pil = None
             return []

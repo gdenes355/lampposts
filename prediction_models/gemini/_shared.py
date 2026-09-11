@@ -1,5 +1,6 @@
 """Shared Gemini client, schema, prompt, and cost tracking."""
 import os
+import threading
 from dataclasses import dataclass, field
 
 from dotenv import load_dotenv
@@ -66,12 +67,18 @@ class CostTracker:
     out_tokens: int = 0
     calls:      int = 0
     errors:     int = 0
+    _lock: threading.Lock = field(default_factory=threading.Lock, repr=False, compare=False)
 
     def add(self, usage) -> None:
-        if usage:
-            self.in_tokens  += usage.prompt_token_count or 0
-            self.out_tokens += usage.candidates_token_count or 0
-        self.calls += 1
+        with self._lock:
+            if usage:
+                self.in_tokens  += usage.prompt_token_count or 0
+                self.out_tokens += usage.candidates_token_count or 0
+            self.calls += 1
+
+    def add_error(self) -> None:
+        with self._lock:
+            self.errors += 1
 
     @property
     def cost_usd(self) -> float:

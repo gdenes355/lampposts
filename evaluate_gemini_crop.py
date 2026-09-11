@@ -1,8 +1,10 @@
 """Evaluate the Gemini sliding-window crop detector on a sample of tiles."""
 import math
 import random
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from data_utils.gpkg.gpkg_loader import load_points
+from data_utils.models import Point, Tile
 from evaluate_yolo_crop import EvalResult, load_all_tiles
 from prediction_models.gemini._shared import CostTracker
 from prediction_models.gemini.gemini_crop_model import GeminiCropModel
@@ -11,6 +13,36 @@ _MATCH_DIST_M = 5.0
 _SAMPLE_FRAC  = 0.01   # fraction of all tiles to evaluate (tweak as needed)
 _SEED         = 42
 _CROP_PX      = 500    # crop window size in pixels
+_MAX_WORKERS  = 3      # parallel Gemini requests (each tile fires ~9 crops)
+
+
+def _process_tile(
+    args: tuple[int, int, Tile, list[Point], GeminiCropModel, CostTracker]
+) -> tuple[int, int, int, int, bool, int]:
+    """Returns (tp, fp, fn, fp_empty, is_empty, gt_count)."""
+    idx, total, tile, points, model, tracker = args
+    gt = [p for p in points if tile.is_inside(p)]
+    preds = model.predict(tile, tracker=tracker)
+    print(f"[{idx}/{total}] {tile.path}  GT={len(gt)}  preds={len(preds)}")
+
+    if not gt:
+        return 0, len(preds), 0, len(preds), True, 0
+
+    matched_gt   = set()
+    matched_pred = set()
+    for i_p, pred in enumerate(preds):
+        for j, truth in enumerate(gt):
+            if j in matched_gt:
+                continue
+            if math.dist((pred.x, pred.y), (truth.x, truth.y)) <= _MATCH_DIST_M:
+                matched_gt.add(j)
+                matched_pred.add(i_p)
+                break
+
+    tp = len(matched_gt)
+    fp = len(preds) - len(matched_pred)
+    fn = len(gt)    - len(matched_gt)
+    return tp, fp, fn, 0, False, len(gt)
 
 
 def evaluate(tiles, points, crop_px: int = _CROP_PX) -> tuple[EvalResult, CostTracker]:
@@ -18,59 +50,32 @@ def evaluate(tiles, points, crop_px: int = _CROP_PX) -> tuple[EvalResult, CostTr
     tracker = CostTracker()
 
     tp = fp = fn = fp_empty = n_empty = n_gt_total = 0
+    total = len(tiles)
 
-    for i, tile in enumerate(tiles):
-        gt = [p for p in points if tile.is_inside(p)]
-        n_windows = _estimate_windows(tile, crop_px)
-        print(f"[{i+1}/{len(tiles)}] {tile.path}  GT={len(gt)}  ~{n_windows} crops", end="  ")
-        preds = model.predict(tile, tracker=tracker)
-        print(f"preds={len(preds)}")
-        n_gt_total += len(gt)
+    args_list = [(i + 1, total, tile, points, model, tracker) for i, tile in enumerate(tiles)]
 
-        if not gt:
-            n_empty  += 1
-            fp_empty += len(preds)
-            fp       += len(preds)
-            continue
-
-        matched_gt   = set()
-        matched_pred = set()
-        for i_p, pred in enumerate(preds):
-            for j, truth in enumerate(gt):
-                if j in matched_gt:
-                    continue
-                if math.dist((pred.x, pred.y), (truth.x, truth.y)) <= _MATCH_DIST_M:
-                    matched_gt.add(j)
-                    matched_pred.add(i_p)
-                    break
-
-        tp += len(matched_gt)
-        fp += len(preds) - len(matched_pred)
-        fn += len(gt)    - len(matched_gt)
+    with ThreadPoolExecutor(max_workers=_MAX_WORKERS) as pool:
+        futures = {pool.submit(_process_tile, args): args for args in args_list}
+        for future in as_completed(futures):
+            t, f, n, fpe, is_empty, gt_count = future.result()
+            tp += t; fp += f; fn += n
+            n_gt_total += gt_count
+            if is_empty:
+                n_empty  += 1
+                fp_empty += fpe
 
     precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
     recall    = tp / (tp + fn) if (tp + fn) > 0 else 0.0
     f1        = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0.0
 
-    result = EvalResult(
-        n_tiles=len(tiles),
+    return EvalResult(
+        n_tiles=total,
         n_gt=n_gt_total,
         tp=tp, fp=fp, fn=fn,
         precision=precision, recall=recall, f1=f1,
         fp_empty_tiles=fp_empty,
         n_empty_tiles=n_empty,
-    )
-    return result, tracker
-
-
-def _estimate_windows(tile, crop_px: int, stride: int = 375) -> int:
-    from data_utils.tile.tile_loader import load_tile
-    import math
-    # Tiles are 3000×3000 px; use that as a rough estimate without loading image
-    w = h = 3000
-    cols = math.ceil(w / stride)
-    rows = math.ceil(h / stride)
-    return cols * rows
+    ), tracker
 
 
 if __name__ == "__main__":
@@ -84,7 +89,7 @@ if __name__ == "__main__":
     sample   = shuffled[:n_sample]
 
     print(f"{len(all_tiles)} total tiles → evaluating {n_sample} "
-          f"({_SAMPLE_FRAC*100:.1f}%)  crop_px={_CROP_PX}\n")
+          f"({_SAMPLE_FRAC*100:.1f}%)  crop_px={_CROP_PX}  workers={_MAX_WORKERS}\n")
 
     result, tracker = evaluate(sample, collection.points, crop_px=_CROP_PX)
 

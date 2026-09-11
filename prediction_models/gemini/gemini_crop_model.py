@@ -57,7 +57,7 @@ class GeminiCropModel:
             except Exception as exc:
                 print(f"  [Gemini error on crop ({x0},{y0})] {exc}")
                 if tracker:
-                    tracker.errors += 1
+                    tracker.add_error()
                 continue
 
             if tracker:
